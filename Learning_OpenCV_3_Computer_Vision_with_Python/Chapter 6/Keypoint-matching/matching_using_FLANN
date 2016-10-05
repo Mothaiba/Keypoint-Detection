@@ -1,0 +1,71 @@
+'''
+This program compare flann vs brute-force matching
+flann is indeed faster. For an examplar experiment,
+    flann consumes 3.8 ms when bf needs 22.8 ms
+
+for bonus, I also compare SIFT and SURF,
+    SIFT needs 437ms, when it is just 102ms for SURF
+'''
+
+import cv2
+import numpy as np
+import imutils
+
+import datetime
+from os.path import isfile, join
+from os import listdir
+
+def keypoint_matching(_img1, _img2, lowe_ratio=0.6):
+
+    img1 = imutils.resize(cv2.imread(_img1, -1), height=400)
+    img2 = imutils.resize(cv2.imread(_img2, -1), height=400)
+
+    begin_time = datetime.datetime.now()
+    model = cv2.xfeatures2d.SURF_create()
+    kps1, desc1 = model.detectAndCompute(img1, None)
+    kps2, desc2 = model.detectAndCompute(img2, None)
+    print 'surf time:', datetime.datetime.now() - begin_time
+
+    begin_time = datetime.datetime.now()
+    model = cv2.xfeatures2d.SIFT_create()
+    kps1, desc1 = model.detectAndCompute(img1, None)
+    kps2, desc2 = model.detectAndCompute(img2, None)
+    print 'sift time:', datetime.datetime.now() - begin_time
+
+    FLANN_INDEX_TREE = 0
+    indexParams = dict(algorithm = FLANN_INDEX_TREE, trees = 5)
+    searchParams = dict(checks = 50)
+
+    begin_time = datetime.datetime.now()
+    flann = cv2.FlannBasedMatcher(indexParams=indexParams, searchParams=searchParams)
+    matches = flann.knnMatch(desc1, desc2, k = 2)
+    print 'flann time:', datetime.datetime.now() - begin_time
+
+    begin_time = datetime.datetime.now()
+    # bf = cv2.DescriptorMatcher_create('BruteForce')
+    bf = cv2.BFMatcher()
+    matches = bf.knnMatch(desc1, desc2, 2)
+    print 'brute-force time:', datetime.datetime.now() - begin_time
+
+    matchesMask = [[0, 0] for _ in range(len(matches))]
+
+    for i, (m1, m2) in enumerate(matches):
+        if m1.distance < lowe_ratio * m2.distance:
+            matchesMask[i] = [1, 0]
+
+    drawParams = dict(
+        matchColor=(0, 255, 0),
+        singlePointColor=(255, 0, 0),
+        matchesMask=matchesMask
+    )
+
+    match_result = cv2.drawMatchesKnn(img1, kps1, img2, kps2, matches, None, **drawParams)
+
+    cv2.imshow('matched result', match_result)
+    cv2.waitKey()
+
+if __name__ == '__main__':
+    _path = '../images/'
+
+    _images = [join(_path, f) for f in listdir(_path) if isfile(join(_path, f))]
+    keypoint_matching(_images[0], _images[1])

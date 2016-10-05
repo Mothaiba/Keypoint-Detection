@@ -1,0 +1,49 @@
+"""
+This program filter high-pass and low-pass
+Low-pass filtering is efficient to de-noise image
+"""
+
+import cv2
+import numpy as np
+from scipy import ndimage
+
+
+def passFilter(img, _threshold=2, high_pass=True):
+    kernel_3x3 = np.array([[-1, -1, -1],
+                        [-1, 8, -1],
+                        [-1, -1, -1]])
+    kernel_5x5 = np.array([[-1, -1, -1, -1, -1],
+                              [-1, 1, 2, 1, -1],
+                              [-1, 2, 4, 2, -1],
+                              [-1, 1, 2, 1, -1],
+                              [-1, -1, -1, -1, -1]])
+
+    hp_threshold = _threshold * kernel_5x5.shape[0] * kernel_5x5.shape[1]
+
+    points = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+    conv_img = ndimage.convolve(img.astype('float64'), kernel_5x5)
+
+    if high_pass:
+        points[np.absolute(conv_img) > hp_threshold] = [0, 255, 0]
+    else:
+        points[np.absolute(conv_img) < hp_threshold] = [0, 255, 0]
+
+    return points
+
+if __name__ == '__main__':
+    image = cv2.imread('screenshot.png', 0)
+    hp_points = passFilter(image, high_pass=True, _threshold=2)
+    lp_points = passFilter(image, high_pass=False, _threshold=2)
+
+    cv2.imshow('original', image)
+    cv2.imshow('high pass points', hp_points)
+    cv2.imshow('low pass points', lp_points)
+
+    tmp = cv2.GaussianBlur(image, (11, 11), 0)
+    smoothed = np.copy(image)
+    smoothed[lp_points[:, :, 1] == 255] = tmp[lp_points[:, :, 1] == 255]
+
+    cv2.imshow('smooth image', smoothed)
+
+    cv2.waitKey()
